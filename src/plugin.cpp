@@ -43,12 +43,38 @@ KateOllamaPlugin::KateOllamaPlugin(QObject* parent, const QVariantList&)
 {
 }
 
-KateOllamaView::KateOllamaView(KateOllamaPlugin *, KTextEditor::MainWindow *mainwindow)
+int KateOllamaPlugin::configPages() const
+{
+    return 1;
+}
+
+void KateOllamaPlugin::setModel(QString model)
+{
+    m_model = model;
+}
+
+void KateOllamaPlugin::setUrl(QString url)
+{
+    m_url = url;
+}
+
+QString KateOllamaPlugin::model() const
+{
+    return m_model;
+}
+
+QString KateOllamaPlugin::url() const
+{
+    return m_url;
+}
+
+KateOllamaView::KateOllamaView(KateOllamaPlugin *plugin, KTextEditor::MainWindow *mainwindow)
     : KXMLGUIClient()
+    , m_plugin(plugin)
     , m_mainWindow(mainwindow)
 {
     KXMLGUIClient::setComponentName(u"kateollama"_s, i18n("Kate-Ollama"));
-    
+
     auto ac = actionCollection();
     QAction *a = ac->addAction(QStringLiteral("kateollama"));
     a->setText(i18n("Run Ollama"));
@@ -80,11 +106,11 @@ void KateOllamaView::ollamaRequest(QString prompt) {
     KTextEditor::Document *document = view->document();
     QNetworkAccessManager *manager = new QNetworkAccessManager(this);
 
-    QNetworkRequest request(QUrl("http://localhost:11434/api/generate"));
+    QNetworkRequest request(QUrl(m_plugin->url() + "/api/generate"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     QJsonObject json;
-    json.insert("model", "llama3.2:latest");
+    json.insert("model", m_plugin->model());
     json.insert("prompt", prompt);
     QJsonDocument doc(json);
 
@@ -109,9 +135,6 @@ void KateOllamaView::ollamaRequest(QString prompt) {
     });
 
     connect(reply, &QNetworkReply::finished, this, [=]() {
-            if (reply->error() != QNetworkReply::NoError) {
-                qDebug() << "Error:" << reply->errorString();
-            }
             reply->deleteLater();
 
             KTextEditor::Cursor cursor = view->cursorPosition();
@@ -126,15 +149,13 @@ QString KateOllamaView::getPrompt() {
 
     QRegularExpression re("// AI:(.*)");
     QRegularExpressionMatchIterator matchIterator = re.globalMatch(text);
-    QString prompt = "";
-    
-    while (matchIterator.hasNext()) {
-        QRegularExpressionMatch match = matchIterator.next();
-        prompt = match.captured(1).trimmed();
-    }
-    qDebug() << "Ollama prompt:" << prompt;
 
-    return prompt;
+    if (matchIterator.hasNext()) {
+        QRegularExpressionMatch match = matchIterator.next();
+        return match.captured(1).trimmed();
+    }
+
+    return {};
 }
 
 void KateOllamaView::onSinglePrompt()
@@ -142,7 +163,7 @@ void KateOllamaView::onSinglePrompt()
     KTextEditor::View *view = m_mainWindow->activeView();
     if (view) {
         QString prompt = KateOllamaView::getPrompt();
-        if (!prompt.isEmpty()) {            
+        if (!prompt.isEmpty()) {
             KateOllamaView::ollamaRequest(prompt);
         }
     }
@@ -158,12 +179,12 @@ QObject* KateOllamaPlugin::createView(KTextEditor::MainWindow* mainwindow)
     return new KateOllamaView(this, mainwindow);
 }
 
-// KTextEditor::ConfigPage *KateOllamaPlugin::configPage(int number, QWidget *parent)
-// {
-//     if (number != 0) {
-//         return nullptr;
-//     }
-//     return new KateOllamaConfigPage(parent, this);
-// }
+KTextEditor::ConfigPage *KateOllamaPlugin::configPage(int number, QWidget *parent)
+{
+    if (number != 0) {
+        return nullptr;
+    }
+    return new KateOllamaConfigPage(parent, this);
+}
 
 #include <plugin.moc>

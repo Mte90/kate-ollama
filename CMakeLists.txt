@@ -34,15 +34,15 @@ find_package(KF6 ${KF6_DEP_VERSION}
 set(PROJECT_SOURCES
     src/plugin.cpp
     src/plugin.h
-    #src/settings.h
-    #src/settings.cpp
+    src/settings.h
+    src/settings.cpp
 )
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins)
 
 kcoreaddons_add_plugin(kateollama INSTALL_NAMESPACE "kf6/ktexteditor")
 target_compile_definitions(kateollama PRIVATE TRANSLATION_DOMAIN="kateollama")
-target_link_libraries(kateollama PRIVATE KF6::I18n KF6::TextEditor)
-target_sources(kateollama  PRIVATE ${PROJECT_SOURCES})
+target_link_libraries(kateollama PUBLIC KF6::I18n KF6::TextEditor)
+target_sources(kateollama PRIVATE ${PROJECT_SOURCES})
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)

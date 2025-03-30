@@ -17,6 +17,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QVBoxLayout>
+#include <qobject.h>
 
 KateOllamaConfigPage::KateOllamaConfigPage(QWidget *parent, KateOllamaPlugin *plugin)
     : KTextEditor::ConfigPage(parent)
@@ -25,19 +26,19 @@ KateOllamaConfigPage::KateOllamaConfigPage(QWidget *parent, KateOllamaPlugin *pl
     QVBoxLayout *layout = new QVBoxLayout(this);
 
     comboBox = new QComboBox(this);
+    QObject::connect(comboBox, &QComboBox::currentIndexChanged, this, &KateOllamaConfigPage::changed);
     layout->addWidget(comboBox);
 
     lineEdit = new QLineEdit(this);
+    QObject::connect(lineEdit, &QLineEdit::textEdited, this, &KateOllamaConfigPage::changed);
     layout->addWidget(lineEdit);
 
     setLayout(layout);
-
     loadSettings();
-    
-    fetchModelList();
 }
 
-void KateOllamaConfigPage::fetchModelList() {
+void KateOllamaConfigPage::fetchModelList()
+{
     QNetworkAccessManager *manager = new QNetworkAccessManager(this);
     connect(manager, &QNetworkAccessManager::finished, this, [this](QNetworkReply *reply) {
         if (reply->error() == QNetworkReply::NoError) {
@@ -55,13 +56,11 @@ void KateOllamaConfigPage::fetchModelList() {
                     }
                 }
             }
-        } else {
-            qWarning() << "Error fetching model list:" << reply->errorString();
         }
         reply->deleteLater();
     });
 
-    QUrl url("http://localhost:11434/models");
+    QUrl url(lineEdit->text() + "/models");
     QNetworkRequest request(url);
     manager->get(request);
 }
@@ -83,18 +82,38 @@ QIcon KateOllamaConfigPage::icon() const
 
 void KateOllamaConfigPage::defaults()
 {
-    reset();
+    comboBox->setCurrentText("llama3.2:latest");
+    lineEdit->setText("http://localhost:11434");
+    m_plugin->setUrl(lineEdit->text());
+    m_plugin->setModel(comboBox->currentText());
 }
 
-void KateOllamaConfigPage::saveSettings() {
+void KateOllamaConfigPage::reset()
+{
+    loadSettings();
+    m_plugin->setUrl(lineEdit->text());
+    m_plugin->setModel(comboBox->currentText());
+}
+
+void KateOllamaConfigPage::apply()
+{
+    saveSettings();
+    m_plugin->setUrl(lineEdit->text());
+    m_plugin->setModel(comboBox->currentText());
+}
+
+void KateOllamaConfigPage::saveSettings()
+{
     KConfigGroup group(KSharedConfig::openConfig(), "KateOllama");
     group.writeEntry("Model", comboBox->currentText());
     group.writeEntry("SystemPrompt", lineEdit->text());
     group.sync();
 }
 
-void KateOllamaConfigPage::loadSettings() {
+void KateOllamaConfigPage::loadSettings()
+{
     KConfigGroup group(KSharedConfig::openConfig(), "KateOllama");
+    lineEdit->setText(group.readEntry("SystemPrompt", "http://localhost:11434"));
+    fetchModelList();
     comboBox->setCurrentText(group.readEntry("Model", "llama3.2:latest"));
-    lineEdit->setText(group.readEntry("SystemPrompt", ""));
 }
